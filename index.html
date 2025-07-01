@@ -366,7 +366,6 @@
 
   <!-- Action Buttons -->
   <div class="buttons-group" aria-label="Actions">
-    <button class="button" id="resetButton" aria-label="Reset Color to White">Reset</button>
     <button class="button" id="saveFavorite" aria-label="Save current color as favorite">Save Favorite</button>
     <button class="button" id="showFavorites" aria-label="Show saved favorite colors">Show Favorites</button>
     <button class="button" id="resetDefault" aria-label="Reset to default color">Reset to Default</button>
@@ -614,10 +613,6 @@
   });
 
   // Buttons
-  document.getElementById('resetButton').addEventListener('click', () => {
-    ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
-    updateUI();
-  });
   document.getElementById('resetDefault').addEventListener('click', () => {
     ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
     updateUI();
