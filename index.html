@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Color Selector</title>
+<title>Color Selector with Image & Eyedropper</title>
 <!-- Include RoundSlider CSS -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/roundSlider/1.6.1/roundslider.min.css" rel="stylesheet" />
 <!-- External CSS -->
@@ -63,14 +63,14 @@
     font-weight: 400;
     font-size: 1rem;
   }
-  /* Placeholder */
   input::placeholder {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-weight: 400;
     font-size: 1rem;
     color: #aaa;
   }
-  /* Existing styles ... */
+
+  /* Container styles */
   * {
     box-sizing: border-box;
   }
@@ -244,6 +244,7 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     cursor: pointer;
   }
+
   /* Toast message styling */
   #toast {
     position: fixed;
@@ -259,6 +260,7 @@
     transition: opacity 0.3s;
     z-index: 9999;
   }
+
   /* Responsive adjustments */
   @media(max-width: 700px){
     #colorPreviewSection {
@@ -276,7 +278,7 @@
     }
   }
 
-  /* Modern slider styles for a sleek look */
+  /* Slider styles for a sleek look */
   .rs-container {
     box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
     border-radius: 50%;
@@ -289,10 +291,6 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     transition: background-color 0.3s, box-shadow 0.3s;
   }
-  .rs-handle:hover, .rs-handle:focus {
-    background-color: #3700b3;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-  }
   .rs-tooltip {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: 14px;
@@ -300,6 +298,30 @@
     background: #fff;
     border-radius: 8px;
     padding: 4px 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  }
+
+  /* Additional styles for image upload and display */
+  #imagePreviewContainer {
+    margin: 20px 0;
+    text-align: center;
+  }
+  #uploadedImage {
+    max-width: 100%;
+    max-height: 400px;
+    cursor: crosshair;
+    display: block;
+    margin: 0 auto;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+  }
+  #colorPreview {
+    margin-top: 10px;
+    display: inline-block;
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    border: 2px solid #fff;
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   }
 </style>
@@ -366,6 +388,26 @@
     <div class="swatch" style="background-color: #ffa500;" aria-label="Orange" data-r="255" data-g="165" data-b="0" tabindex="0"></div>
   </div>
 
+  <!-- Image Upload & Preview -->
+  <div id="imageUploadSection" style="margin-top:20px; width:100%; max-width:950px; text-align:center;">
+    <h3>Upload Image for Color Picking</h3>
+    <input type="file" id="imageUploader" accept="image/*" style="margin-bottom:10px;">
+    <div id="imagePreviewContainer">
+      <img id="uploadedImage" align="center" src="" alt="Uploaded Image Preview" />
+      <div style="margin-top:10px;">
+        <span>Selected Color:</span>
+        <div id="colorPreview"></div>
+        <input type="text" id="selectedColorHex" readonly style="border:none; background:none; font-weight:bold; margin-left:10px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Eyedropper Button -->
+  <div style="margin-top:10px;">
+    <button class="button" id="eyedropperBtn" aria-label="Activate eyedropper mode" style="display:inline-flex; align-items:center;">🔍 Eyedropper</button>
+    <button class="button" id="cancelEyedropper" aria-label="Cancel eyedropper mode" style="display:none;">Cancel</button>
+  </div>
+
 </section>
 
 <!-- Recent Colors -->
@@ -383,275 +425,364 @@
 
 <!-- Custom JS -->
 <script>
-  // Encapsulate color state
-const ColorState = {
-  red: 255,
-  green: 255,
-  blue: 255,
-  alpha: 1,
-  recentColors: [],
-  favorites: JSON.parse(localStorage.getItem('favorites')) || [],
+  const ColorState = {
+    red: 255,
+    green: 255,
+    blue: 255,
+    alpha: 1,
+    recentColors: [],
+    favorites: JSON.parse(localStorage.getItem('favorites')) || [],
 
-  // Convert to rgba string
-  toRGBA() {
-    return `rgba(${this.red}, ${this.green}, ${this.blue}, ${this.alpha.toFixed(2)})`;
-  },
+    toRGBA() {
+      return `rgba(${this.red}, ${this.green}, ${this.blue}, ${this.alpha.toFixed(2)})`;
+    },
 
-  // Convert to hex string
-  toHex() {
-    const componentToHex = c => {
-      const hex = c.toString(16);
-      return hex.length === 1 ? "0" + hex : hex;
-    };
-    return "#" + componentToHex(this.red) + componentToHex(this.green) + componentToHex(this.blue);
-  },
+    toHex() {
+      const componentToHex = c => {
+        const hex = c.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      };
+      return "#" + componentToHex(this.red) + componentToHex(this.green) + componentToHex(this.blue);
+    },
 
-  // Add to recent colors
-  addRecent(colorStr) {
-    if (!this.recentColors.includes(colorStr)) {
-      this.recentColors.unshift(colorStr);
-      if (this.recentColors.length > 8) this.recentColors.pop();
-      renderRecentColors();
-    }
-  },
-
-  // Save to localStorage
-  saveFavorites() {
-    localStorage.setItem('favorites', JSON.stringify(this.favorites));
-  },
-
-  // Load favorites
-  loadFavorites() {
-    this.favorites = JSON.parse(localStorage.getItem('favorites')) || [];
-  }
-};
-
-// Utility functions
-function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.innerText = msg;
-  toast.style.opacity = 1;
-  setTimeout(() => { toast.style.opacity = 0; }, 2000);
-}
-
-function copyText(id) {
-  const input = document.getElementById(id);
-  navigator.clipboard.writeText(input.value).then(() => showToast('Copied: ' + input.value));
-}
-
-function applyColorFromRGBA(rgbaStr) {
-  const match = rgbaStr.match(/rgba?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01](?:\.\d+)?)\)/);
-  if (match) {
-    ColorState.red = parseInt(match[1]);
-    ColorState.green = parseInt(match[2]);
-    ColorState.blue = parseInt(match[3]);
-    ColorState.alpha = parseFloat(match[4]);
-    updateUI();
-  }
-}
-
-// Initialize sliders
-function setupSliders() {
-  $('#redSlider').roundSlider({
-    sliderType: "min-range",
-    handleShape: "round",
-    width: 10,
-    radius: 60,
-    min: 0,
-    max: 255,
-    value: ColorState.red,
-    circleShape: "full",
-    editableTooltip: false,
-    change: (e) => { ColorState.red = e.value; updateUI(); },
-    drag: (e) => { ColorState.red = e.value; updateUI(); }
-  });
-  $('#greenSlider').roundSlider({
-    sliderType: "min-range",
-    handleShape: "round",
-    width: 10,
-    radius: 60,
-    min: 0,
-    max: 255,
-    value: ColorState.green,
-    circleShape: "full",
-    editableTooltip: false,
-    change: (e) => { ColorState.green = e.value; updateUI(); },
-    drag: (e) => { ColorState.green = e.value; updateUI(); }
-  });
-  $('#blueSlider').roundSlider({
-    sliderType: "min-range",
-    handleShape: "round",
-    width: 10,
-    radius: 60,
-    min: 0,
-    max: 255,
-    value: ColorState.blue,
-    circleShape: "full",
-    editableTooltip: false,
-    change: (e) => { ColorState.blue = e.value; updateUI(); },
-    drag: (e) => { ColorState.blue = e.value; updateUI(); }
-  });
-  $('#alphaSlider').roundSlider({
-    sliderType: "min-range",
-    handleShape: "round",
-    width: 10,
-    radius: 60,
-    min: 0,
-    max: 100,
-    value: ColorState.alpha * 100,
-    circleShape: "full",
-    editableTooltip: false,
-    change: (e) => { ColorState.alpha = e.value / 100; updateUI(); },
-    drag: (e) => { ColorState.alpha = e.value / 100; updateUI(); }
-  });
-}
-
-// Update UI elements based on current color state
-function updateUI() {
-  const rgbaStr = ColorState.toRGBA();
-  const hexStr = ColorState.toHex();
-
-  // Update preview
-  document.getElementById('largePreview').style.backgroundColor = rgbaStr;
-  document.getElementById('colorContainer').style.backgroundColor = rgbaStr;
-
-  // Update color code inputs
-  document.getElementById('rgbCode').value = rgbaStr;
-  document.getElementById('hexCode').value = hexStr;
-
-  // Update input fields
-  document.getElementById('inputRGBA').value = rgbaStr;
-  document.getElementById('inputHex').value = hexStr;
-
-  // Update sliders
-  $('#redSlider').roundSlider('setValue', ColorState.red);
-  $('#greenSlider').roundSlider('setValue', ColorState.green);
-  $('#blueSlider').roundSlider('setValue', ColorState.blue);
-  $('#alphaSlider').roundSlider('setValue', ColorState.alpha * 100);
-
-  // Save last color
-  localStorage.setItem('lastColor', JSON.stringify(ColorState));
-  // Add to recent colors
-  ColorState.addRecent(rgbaStr);
-}
-
-// Render recent colors
-function renderRecentColors() {
-  const container = document.getElementById('recentColors');
-  container.innerHTML = '';
-  ColorState.recentColors.forEach(color => {
-    const swatch = document.createElement('div');
-    swatch.className = 'recent-swatch';
-    swatch.style.backgroundColor = color;
-    swatch.setAttribute('aria-label', 'Recent color');
-    swatch.setAttribute('tabindex', '0');
-    swatch.onclick = () => { applyColorFromRGBA(color); };
-    swatch.onkeydown = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        applyColorFromRGBA(color);
-        e.preventDefault();
+    addRecent(colorStr) {
+      if (!this.recentColors.includes(colorStr)) {
+        this.recentColors.unshift(colorStr);
+        if (this.recentColors.length > 8) this.recentColors.pop();
+        renderRecentColors();
       }
-    };
-    container.appendChild(swatch);
-  });
-}
+    },
 
-// Event handlers for inputs
-document.getElementById('inputRGBA').addEventListener('change', () => {
-  const val = document.getElementById('inputRGBA').value.trim();
-  const match = val.match(/rgba?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01](?:\.\d+)?)\)/);
-  if (!match) { showToast('Invalid RGBA format'); return; }
-  ColorState.red = Math.min(255, parseInt(match[1]));
-  ColorState.green = Math.min(255, parseInt(match[2]));
-  ColorState.blue = Math.min(255, parseInt(match[3]));
-  ColorState.alpha = Math.min(1, parseFloat(match[4]));
-  updateUI();
-});
-document.getElementById('inputHex').addEventListener('change', () => {
-  const val = document.getElementById('inputHex').value.trim();
-  const match = val.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-  if (!match) { showToast('Invalid Hex format'); return; }
-  ColorState.red = parseInt(match[1], 16);
-  ColorState.green = parseInt(match[2], 16);
-  ColorState.blue = parseInt(match[3], 16);
-  updateUI();
-});
+    saveFavorites() {
+      localStorage.setItem('favorites', JSON.stringify(this.favorites));
+    },
 
-// Button event handlers
-document.getElementById('resetButton').addEventListener('click', () => {
-  ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
-  updateUI();
-});
-document.getElementById('resetDefault').addEventListener('click', () => {
-  ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
-  updateUI();
-});
-document.getElementById('saveFavorite').addEventListener('click', () => {
-  ColorState.favorites.push({...ColorState});
-  ColorState.saveFavorites();
-  showToast('Favorite saved!');
-});
-document.getElementById('showFavorites').addEventListener('click', () => {
-  if (ColorState.favorites.length === 0) {
-    alert('No favorites saved.');
-    return;
-  }
-  const list = ColorState.favorites
-    .map((f, i) => `#${i + 1}: rgb(${f.red},${f.green},${f.blue})`)
-    .join('\n');
-  alert('Favorites:\n' + list);
-});
-
-// Initialize sliders
-setupSliders();
-
-// Load last color
-const lastColor = localStorage.getItem('lastColor');
-if (lastColor) {
-  const c = JSON.parse(lastColor);
-  ColorState.red = c.red;
-  ColorState.green = c.green;
-  ColorState.blue = c.blue;
-  ColorState.alpha = c.alpha;
-}
-updateUI();
-
-// Add keyboard support for sliders
-document.querySelectorAll('.rs-control').forEach(slider => {
-  slider.setAttribute('tabindex','0');
-  slider.addEventListener('keydown', (e) => {
-    const max = parseInt(slider.getAttribute('aria-valuemax'));
-    const min = parseInt(slider.getAttribute('aria-valuemin'));
-    let currentVal = parseInt(slider.getAttribute('aria-valuenow'));
-    const step = e.shiftKey ? 10 : 1;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-      const newVal = Math.min(currentVal + step, max);
-      $(slider).roundSlider('setValue', newVal);
-      slider.setAttribute('aria-valuenow', newVal);
-      slider.dispatchEvent(new Event('change'));
-      e.preventDefault();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
-      const newVal = Math.max(currentVal - step, min);
-      $(slider).roundSlider('setValue', newVal);
-      slider.setAttribute('aria-valuenow', newVal);
-      slider.dispatchEvent(new Event('change'));
-      e.preventDefault();
-    }
-  });
-});
-
-// Keyboard support for swatches
-document.querySelectorAll('.swatch').forEach(swatch => {
-  swatch.setAttribute('tabindex', '0');
-  swatch.onkeydown = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      const r = parseInt(swatch.dataset.r);
-      const g = parseInt(swatch.dataset.g);
-      const b = parseInt(swatch.dataset.b);
-      applyColorFromRGBA(`rgba(${r}, ${g}, ${b}, 1)`);
+    loadFavorites() {
+      this.favorites = JSON.parse(localStorage.getItem('favorites')) || [];
     }
   };
-});
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.style.opacity = 1;
+    setTimeout(() => { toast.style.opacity = 0; }, 2000);
+  }
+
+  function copyText(id) {
+    const input = document.getElementById(id);
+    navigator.clipboard.writeText(input.value).then(() => showToast('Copied: ' + input.value));
+  }
+
+  function applyColorFromRGBA(rgbaStr) {
+    const match = rgbaStr.match(/rgba?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01](?:\.\d+)?)\)/);
+    if (match) {
+      ColorState.red = parseInt(match[1]);
+      ColorState.green = parseInt(match[2]);
+      ColorState.blue = parseInt(match[3]);
+      ColorState.alpha = parseFloat(match[4]);
+      updateUI();
+    }
+  }
+
+  function setupSliders() {
+    $('#redSlider').roundSlider({
+      sliderType: "min-range",
+      handleShape: "round",
+      width: 10,
+      radius: 60,
+      min: 0,
+      max: 255,
+      value: ColorState.red,
+      circleShape: "full",
+      editableTooltip: false,
+      change: (e) => { ColorState.red = e.value; updateUI(); },
+      drag: (e) => { ColorState.red = e.value; updateUI(); }
+    });
+    $('#greenSlider').roundSlider({
+      sliderType: "min-range",
+      handleShape: "round",
+      width: 10,
+      radius: 60,
+      min: 0,
+      max: 255,
+      value: ColorState.green,
+      circleShape: "full",
+      editableTooltip: false,
+      change: (e) => { ColorState.green = e.value; updateUI(); },
+      drag: (e) => { ColorState.green = e.value; updateUI(); }
+    });
+    $('#blueSlider').roundSlider({
+      sliderType: "min-range",
+      handleShape: "round",
+      width: 10,
+      radius: 60,
+      min: 0,
+      max: 255,
+      value: ColorState.blue,
+      circleShape: "full",
+      editableTooltip: false,
+      change: (e) => { ColorState.blue = e.value; updateUI(); },
+      drag: (e) => { ColorState.blue = e.value; updateUI(); }
+    });
+    $('#alphaSlider').roundSlider({
+      sliderType: "min-range",
+      handleShape: "round",
+      width: 10,
+      radius: 60,
+      min: 0,
+      max: 100,
+      value: ColorState.alpha * 100,
+      circleShape: "full",
+      editableTooltip: false,
+      change: (e) => { ColorState.alpha = e.value / 100; updateUI(); },
+      drag: (e) => { ColorState.alpha = e.value / 100; updateUI(); }
+    });
+  }
+
+  function updateUI() {
+    const rgbaStr = ColorState.toRGBA();
+    const hexStr = ColorState.toHex();
+
+    document.getElementById('largePreview').style.backgroundColor = rgbaStr;
+    document.getElementById('colorContainer').style.backgroundColor = rgbaStr;
+
+    document.getElementById('rgbCode').value = rgbaStr;
+    document.getElementById('hexCode').value = hexStr;
+
+    document.getElementById('inputRGBA').value = rgbaStr;
+    document.getElementById('inputHex').value = hexStr;
+
+    $('#redSlider').roundSlider('setValue', ColorState.red);
+    $('#greenSlider').roundSlider('setValue', ColorState.green);
+    $('#blueSlider').roundSlider('setValue', ColorState.blue);
+    $('#alphaSlider').roundSlider('setValue', ColorState.alpha * 100);
+
+    localStorage.setItem('lastColor', JSON.stringify(ColorState));
+    ColorState.addRecent(rgbaStr);
+  }
+
+  function renderRecentColors() {
+    const container = document.getElementById('recentColors');
+    container.innerHTML = '';
+    ColorState.recentColors.forEach(color => {
+      const swatch = document.createElement('div');
+      swatch.className = 'recent-swatch';
+      swatch.style.backgroundColor = color;
+      swatch.setAttribute('aria-label', 'Recent color');
+      swatch.setAttribute('tabindex', '0');
+      swatch.onclick = () => { applyColorFromRGBA(color); };
+      swatch.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          applyColorFromRGBA(color);
+          e.preventDefault();
+        }
+      };
+      container.appendChild(swatch);
+    });
+  }
+
+  // Input change events
+  document.getElementById('inputRGBA').addEventListener('change', () => {
+    const val = document.getElementById('inputRGBA').value.trim();
+    const match = val.match(/rgba?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01](?:\.\d+)?)\)/);
+    if (!match) { showToast('Invalid RGBA format'); return; }
+    ColorState.red = Math.min(255, parseInt(match[1]));
+    ColorState.green = Math.min(255, parseInt(match[2]));
+    ColorState.blue = Math.min(255, parseInt(match[3]));
+    ColorState.alpha = Math.min(1, parseFloat(match[4]));
+    updateUI();
+  });
+  document.getElementById('inputHex').addEventListener('change', () => {
+    const val = document.getElementById('inputHex').value.trim();
+    const match = val.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+    if (!match) { showToast('Invalid Hex format'); return; }
+    ColorState.red = parseInt(match[1], 16);
+    ColorState.green = parseInt(match[2], 16);
+    ColorState.blue = parseInt(match[3], 16);
+    updateUI();
+  });
+
+  // Buttons
+  document.getElementById('resetButton').addEventListener('click', () => {
+    ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
+    updateUI();
+  });
+  document.getElementById('resetDefault').addEventListener('click', () => {
+    ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
+    updateUI();
+  });
+  document.getElementById('saveFavorite').addEventListener('click', () => {
+    ColorState.favorites.push({...ColorState});
+    ColorState.saveFavorites();
+    showToast('Favorite saved!');
+  });
+  document.getElementById('showFavorites').addEventListener('click', () => {
+    if (ColorState.favorites.length === 0) {
+      alert('No favorites saved.');
+      return;
+    }
+    const list = ColorState.favorites
+      .map((f, i) => `#${i + 1}: rgb(${f.red},${f.green},${f.blue})`)
+      .join('\n');
+    alert('Favorites:\n' + list);
+  });
+
+  // Initialize sliders and load last color
+  setupSliders();
+  const lastColor = localStorage.getItem('lastColor');
+  if (lastColor) {
+    const c = JSON.parse(lastColor);
+    ColorState.red = c.red;
+    ColorState.green = c.green;
+    ColorState.blue = c.blue;
+    ColorState.alpha = c.alpha;
+  }
+  updateUI();
+
+  // Keyboard support for sliders
+  document.querySelectorAll('.rs-control').forEach(slider => {
+    slider.setAttribute('tabindex','0');
+    slider.addEventListener('keydown', (e) => {
+      const max = parseInt(slider.getAttribute('aria-valuemax'));
+      const min = parseInt(slider.getAttribute('aria-valuemin'));
+      let currentVal = parseInt(slider.getAttribute('aria-valuenow'));
+      const step = e.shiftKey ? 10 : 1;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+        const newVal = Math.min(currentVal + step, max);
+        $(slider).roundSlider('setValue', newVal);
+        slider.setAttribute('aria-valuenow', newVal);
+        slider.dispatchEvent(new Event('change'));
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+        const newVal = Math.max(currentVal - step, min);
+        $(slider).roundSlider('setValue', newVal);
+        slider.setAttribute('aria-valuenow', newVal);
+        slider.dispatchEvent(new Event('change'));
+        e.preventDefault();
+      }
+    });
+  });
+
+  // Swatch keyboard support
+  document.querySelectorAll('.swatch').forEach(swatch => {
+    swatch.setAttribute('tabindex', '0');
+    swatch.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const r = parseInt(swatch.dataset.r);
+        const g = parseInt(swatch.dataset.g);
+        const b = parseInt(swatch.dataset.b);
+        applyColorFromRGBA(`rgba(${r}, ${g}, ${b}, 1)`);
+      }
+    };
+  });
+
+  // --- NEW: Image Upload & Eyedropper Functionality ---
+  const imageUploader = document.getElementById('imageUploader');
+  const uploadedImage = document.getElementById('uploadedImage');
+  const colorPreview = document.getElementById('colorPreview');
+  const selectedColorHexInput = document.getElementById('selectedColorHex');
+
+  let isEyedropperActive = false;
+
+  // Handle image upload
+  imageUploader.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      uploadedImage.src = reader.result;
+      uploadedImage.style.display = 'block';
+      // Reset previous
+      isEyedropperActive = false;
+      document.getElementById('cancelEyedropper').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Activate eyedropper
+  document.getElementById('eyedropperBtn').addEventListener('click', () => {
+    if (!uploadedImage.src) {
+      showToast('Please upload an image first.');
+      return;
+    }
+    isEyedropperActive = true;
+    document.getElementById('cancelEyedropper').style.display = 'inline-block';
+    uploadedImage.style.cursor = 'crosshair';
+    showToast('🔍 Eyedropper activated. Click on the image to pick a color.');
+  });
+
+  // Cancel eyedropper
+  document.getElementById('cancelEyedropper').addEventListener('click', () => {
+    isEyedropperActive = false;
+    document.getElementById('cancelEyedropper').style.display = 'none';
+    uploadedImage.style.cursor = 'default';
+  });
+
+  // Click on image to pick color with accurate cursor mapping
+  uploadedImage.addEventListener('click', (e) => {
+    if (!isEyedropperActive) return;
+    const rect = uploadedImage.getBoundingClientRect();
+    const scaleX = uploadedImage.naturalWidth / rect.width;
+    const scaleY = uploadedImage.naturalHeight / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = uploadedImage.naturalWidth;
+    canvas.height = uploadedImage.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(uploadedImage, 0, 0);
+    const pixelData = ctx.getImageData(x, y, 1, 1).data;
+    const r = pixelData[0];
+    const g = pixelData[1];
+    const b = pixelData[2];
+    const a = pixelData[3] / 255;
+    // Update global color
+    ColorState.red = r;
+    ColorState.green = g;
+    ColorState.blue = b;
+    ColorState.alpha = a;
+    updateUI();
+    // Show selected color
+    const rgbaStr = `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
+    colorPreview.style.backgroundColor = rgbaStr;
+    selectedColorHexInput.value = ColorState.toHex();
+    // Deactivate eyedropper
+    isEyedropperActive = false;
+    document.getElementById('cancelEyedropper').style.display = 'none';
+    uploadedImage.style.cursor = 'default';
+    showToast('🎨 Color picked from image.');
+  });
+
+  // Hover preview with accurate cursor position
+  uploadedImage.addEventListener('mousemove', (e) => {
+    if (!uploadedImage.src || !isEyedropperActive) return;
+    const rect = uploadedImage.getBoundingClientRect();
+    const scaleX = uploadedImage.naturalWidth / rect.width;
+    const scaleY = uploadedImage.naturalHeight / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+    const canvas = document.createElement('canvas');
+    canvas.width = uploadedImage.naturalWidth;
+    canvas.height = uploadedImage.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(uploadedImage, 0, 0);
+    const pixelData = ctx.getImageData(x, y, 1, 1).data;
+    const r = pixelData[0];
+    const g = pixelData[1];
+    const b = pixelData[2];
+    const a = pixelData[3] / 255;
+    const rgbaStr = `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
+    // Show hover preview
+    colorPreview.style.backgroundColor = rgbaStr;
+  });
+
+  uploadedImage.addEventListener('mouseleave', () => {
+    if (ColorState) {
+      updateUI();
+    }
+  });
 </script>
 </body>
 </html>
