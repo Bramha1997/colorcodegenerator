@@ -350,6 +350,9 @@
         <input id="hexCode" type="text" readonly aria-label="Hex Color Code" />
         <button class="button" onclick="copyText('hexCode')" aria-label="Copy Hex Code">Copy Hex</button>
       </div>
+	  <div id="colorNameDisplay" style="margin-top: 15px; font-weight: 600; font-size: 1.2rem; color: #222; text-align: center;">
+		Color Name: <span id="colorName">Unknown</span>
+	  </div>
     </div>
   </div>
 
@@ -422,6 +425,8 @@
 <!-- External JS Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/roundSlider/1.6.1/roundslider.min.js"></script>
+<script type="text/javascript" src="https://chir.ag/projects/ntc/ntc.js"></script>
+
 
 <!-- Custom JS -->
 <script>
@@ -560,6 +565,11 @@
 
     localStorage.setItem('lastColor', JSON.stringify(ColorState));
     ColorState.addRecent(rgbaStr);
+	
+	var n_match = ntc.name(hexStr);
+    n_name = n_match[1]; // Text string: Color name
+
+    document.getElementById('colorName').innerText = n_name;
   }
 
   function renderRecentColors() {
