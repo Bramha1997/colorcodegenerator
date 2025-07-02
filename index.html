@@ -105,6 +105,7 @@
     align-items: center;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
     transition: background-color 0.5s ease;
+    position: relative;
   }
   /* Color Preview Section */
   #colorPreviewSection {
@@ -305,6 +306,7 @@
   #imagePreviewContainer {
     margin: 20px 0;
     text-align: center;
+    position: relative; /* Needed for absolute positioning of label */
   }
   #uploadedImage {
     max-width: 100%;
@@ -350,9 +352,9 @@
         <input id="hexCode" type="text" readonly aria-label="Hex Color Code" />
         <button class="button" onclick="copyText('hexCode')" aria-label="Copy Hex Code">Copy Hex</button>
       </div>
-	  <div id="colorNameDisplay" style="margin-top: 15px; font-weight: 600; font-size: 1.2rem; color: #222; text-align: center;">
-		Color Name: <span id="colorName">Unknown</span>
-	  </div>
+      <div id="colorNameDisplay" style="margin-top: 15px; font-weight: 600; font-size: 1.2rem; color: #222; text-align: center;">
+        Color Name: <span id="colorName">Unknown</span>
+      </div>
     </div>
   </div>
 
@@ -366,6 +368,7 @@
 
   <!-- Action Buttons -->
   <div class="buttons-group" aria-label="Actions">
+    <button class="button" id="resetButton" aria-label="Reset Color to White">Reset</button>
     <button class="button" id="saveFavorite" aria-label="Save current color as favorite">Save Favorite</button>
     <button class="button" id="showFavorites" aria-label="Show saved favorite colors">Show Favorites</button>
     <button class="button" id="resetDefault" aria-label="Reset to default color">Reset to Default</button>
@@ -391,11 +394,13 @@
   </div>
 
   <!-- Image Upload & Preview -->
-  <div id="imageUploadSection" style="margin-top:20px; width:100%; max-width:950px; text-align:center;">
+  <div id="imageUploadSection" style="margin-top:20px; width:100%; max-width:950px; text-align:center; position:relative;">
     <h3>Upload Image for Color Picking</h3>
     <input type="file" id="imageUploader" accept="image/*" style="margin-bottom:10px;">
     <div id="imagePreviewContainer">
       <img id="uploadedImage" align="center" src="" alt="Uploaded Image Preview" />
+      <!-- Add the color name label here -->
+      <div id="colorNameLabel" style="margin-top: 15px; font-weight: 600; font-size: 1.2rem; color: #222; text-align: center;"></div>
       <div style="margin-top:10px;">
         <span>Selected Color:</span>
         <div id="colorPreview"></div>
@@ -406,7 +411,7 @@
 
   <!-- Eyedropper Button -->
   <div style="margin-top:10px;">
-    <button class="button" id="eyedropperBtn" aria-label="Activate eyedropper mode" style="display:inline-flex; align-items:center;">🔍 Eyedropper</button>
+    <button class="button" id="eyedropperBtn" aria-label="Activate eyedropper mode" style="display:inline-flex; align-items:center;">🎨 Color Picker</button>
     <button class="button" id="cancelEyedropper" aria-label="Cancel eyedropper mode" style="display:none;">Cancel</button>
   </div>
 
@@ -425,7 +430,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/roundSlider/1.6.1/roundslider.min.js"></script>
 <script type="text/javascript" src="https://chir.ag/projects/ntc/ntc.js"></script>
-
 
 <!-- Custom JS -->
 <script>
@@ -564,8 +568,8 @@
 
     localStorage.setItem('lastColor', JSON.stringify(ColorState));
     ColorState.addRecent(rgbaStr);
-	
-	var n_match = ntc.name(hexStr);
+    
+    var n_match = ntc.name(hexStr);
     n_name = n_match[1]; // Text string: Color name
 
     document.getElementById('colorName').innerText = n_name;
@@ -613,6 +617,10 @@
   });
 
   // Buttons
+  document.getElementById('resetButton').addEventListener('click', () => {
+    ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
+    updateUI();
+  });
   document.getElementById('resetDefault').addEventListener('click', () => {
     ColorState.red = 255; ColorState.green = 255; ColorState.blue = 255; ColorState.alpha = 1;
     updateUI();
@@ -683,12 +691,16 @@
   });
 
   // --- NEW: Image Upload & Eyedropper Functionality ---
+
   const imageUploader = document.getElementById('imageUploader');
   const uploadedImage = document.getElementById('uploadedImage');
   const colorPreview = document.getElementById('colorPreview');
   const selectedColorHexInput = document.getElementById('selectedColorHex');
 
   let isEyedropperActive = false;
+
+  // Added: Reference to the color name label
+  const colorNameLabel = document.getElementById('colorNameLabel');
 
   // Handle image upload
   imageUploader.addEventListener('change', (e) => {
@@ -781,13 +793,58 @@
     const rgbaStr = `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
     // Show hover preview
     colorPreview.style.backgroundColor = rgbaStr;
+
+    // Get color name
+	const colorInHex = rgbaStringToHex(rgbaStr);
+    const colorName = ntc.name(colorInHex)[1];
+
+    // Position the label near the cursor
+    const labelX = e.clientX + 15; // offset from cursor
+    const labelY = e.clientY + 15;
+
+    // Position the label
+    colorNameLabel.style.left = labelX + 'px';
+    colorNameLabel.style.top = labelY + 'px';
+    // Set the text to color name
+    colorNameLabel.innerText = 'Color: ' + colorName;
+    // Show the label
+    colorNameLabel.style.display = 'block';
+    // Change cursor to crosshair
+    uploadedImage.style.cursor = 'crosshair';
   });
 
+  // Hide label when mouse leaves image
   uploadedImage.addEventListener('mouseleave', () => {
     if (ColorState) {
       updateUI();
     }
+    // Hide the label
+    colorNameLabel.style.display = 'none';
   });
+  
+  function rgbaToHex(r, g, b, a = 1) {
+  // Clamp alpha to [0, 1]
+  a = Math.max(0, Math.min(1, a));
+  
+  // Convert each component to hex and pad with zeroes if needed
+  const toHex = (n) => n.toString(16).padStart(2, '0');
+
+  // Convert alpha to 0–255 and then to hex
+  const alpha = Math.round(a * 255);
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function rgbaStringToHex(rgba) {
+  const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*([\d.]*)?\)/);
+
+  if (!match) return null;
+
+  const [, r, g, b, a = 1] = match.map((v, i) => i > 0 ? parseFloat(v) : v);
+
+  return rgbaToHex(r, g, b, a);
+}
+
 </script>
 </body>
 </html>
